@@ -830,6 +830,7 @@ internal extension Engine {
 
     static private let encoderFactory: RTCVideoEncoderFactory = {
         let encoderFactory = VideoEncoderFactory()
+        encoderFactory.preferredCodec = RTCVideoCodecInfo(name: kRTCVideoCodecVp8Name)
         #if LK_USING_CUSTOM_WEBRTC_BUILD
         return VideoEncoderFactorySimulcast(primary: encoderFactory,
                                             fallback: encoderFactory)
