@@ -24,7 +24,7 @@ import ReplayKit
 
 public class CameraCapturer: VideoCapturer {
 
-    private let capturer: RTCCameraVideoCapturer
+    public let capturer: RTCCameraVideoCapturer
 
     @objc
     public static func captureDevices() -> [AVCaptureDevice] {
