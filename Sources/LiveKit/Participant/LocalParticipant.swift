@@ -150,7 +150,9 @@ public class LocalParticipant: Participant {
 
             // store publishOptions used for this track
             track._publishOptions = publishOptions
-            track.transceiver = transceiver
+
+            track.set(transport: publisher,
+                      rtpSender: transceiver.sender)
 
             // prefer to maintainResolution for screen share
             if case .screenShareVideo = track.source {
@@ -252,7 +254,7 @@ public class LocalParticipant: Participant {
         // engine.publisher must be accessed from engine.queue
         return stopTrackIfRequired().then(on: engine.queue) { _ -> Promise<Void> in
 
-            guard let publisher = engine.publisher, let sender = track.sender else {
+            guard let publisher = engine.publisher, let sender = track.rtpSender else {
                 return Promise(())
             }
 
@@ -301,7 +303,7 @@ public class LocalParticipant: Participant {
                         reliability: Reliability = .reliable,
                         destinations: [RemoteParticipant]? = nil,
                         topic: String? = nil,
-                        options: DataPublishOptions?) -> Promise<Void> {
+                        options: DataPublishOptions? = nil) -> Promise<Void> {
 
         let options = options ?? self.room._state.options.defaultDataPublishOptions
         let destinations = destinations?.map { $0.sid }
@@ -344,6 +346,30 @@ public class LocalParticipant: Participant {
         return sendTrackSubscriptionPermissions()
     }
 
+    /// Sets and updates the metadata of the local participant.
+    ///
+    /// Note: this requires `CanUpdateOwnMetadata` permission encoded in the token.
+    public func set(metadata: String) -> Promise<Void> {
+        // mutate state to set metadata and copy name from state
+        let name = _state.mutate {
+            $0.metadata = metadata
+            return $0.name
+        }
+        return room.engine.signalClient.sendUpdateLocalMetadata(metadata, name: name)
+    }
+
+    /// Sets and updates the name of the local participant.
+    ///
+    /// Note: this requires `CanUpdateOwnMetadata` permission encoded in the token.
+    public func set(name: String) -> Promise<Void> {
+        // mutate state to set name and copy metadata from state
+        let metadata = _state.mutate {
+            $0.name = name
+            return $0.metadata
+        }
+        return room.engine.signalClient.sendUpdateLocalMetadata(metadata ?? "", name: name)
+    }
+
     internal func sendTrackSubscriptionPermissions() -> Promise<Void> {
 
         guard room.engine._state.connectionState == .connected else {
@@ -362,7 +388,7 @@ public class LocalParticipant: Participant {
 
         guard let pub = getTrackPublication(sid: trackSid),
               let track = pub.track as? LocalVideoTrack,
-              let sender = track.transceiver?.sender
+              let sender = track.rtpSender
         else { return }
 
         let parameters = sender.parameters

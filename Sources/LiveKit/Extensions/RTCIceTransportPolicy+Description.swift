@@ -15,19 +15,16 @@
  */
 
 import Foundation
+import WebRTC
 
-// Objects are considered equal if both states are equal
-
-public extension TrackPublication {
-
-    override var hash: Int {
-        var hasher = Hasher()
-        hasher.combine(_state.copy())
-        return hasher.finalize()
-    }
-
-    override func isEqual(_ object: Any?) -> Bool {
-        guard let other = object as? Self else { return false }
-        return self._state.copy() == other._state.copy()
+extension RTCIceTransportPolicy: CustomStringConvertible {
+    public var description: String {
+        switch self {
+        case .none: return "none"
+        case .relay: return "relay"
+        case .noHost: return "noHost"
+        case .all: return "all"
+        @unknown default: return "unknown"
+        }
     }
 }
