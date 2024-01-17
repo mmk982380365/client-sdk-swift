@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 LiveKit
+ * Copyright 2024 LiveKit
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,12 +15,11 @@
  */
 
 import Foundation
-import WebRTC
-import Promises
 
-private extension Array where Element: RTCVideoCodecInfo {
+@_implementationOnly import WebRTC
 
-    func rewriteCodecsIfNeeded() -> [RTCVideoCodecInfo] {
+private extension Array where Element: LKRTCVideoCodecInfo {
+    func rewriteCodecsIfNeeded() -> [LKRTCVideoCodecInfo] {
         // rewrite H264's profileLevelId to 42e032
         let codecs = map { $0.name == kRTCVideoCodecH264Name ? Engine.h264BaselineLevel5CodecInfo : $0 }
         // logger.log("supportedCodecs: \(codecs.map({ "\($0.name) - \($0.parameters)" }).joined(separator: ", "))", type: Engine.self)
@@ -28,63 +27,58 @@ private extension Array where Element: RTCVideoCodecInfo {
     }
 }
 
-private class VideoEncoderFactory: RTCDefaultVideoEncoderFactory {
-
-    override func supportedCodecs() -> [RTCVideoCodecInfo] {
+private class VideoEncoderFactory: LKRTCDefaultVideoEncoderFactory {
+    override func supportedCodecs() -> [LKRTCVideoCodecInfo] {
         super.supportedCodecs().rewriteCodecsIfNeeded()
     }
 }
 
-private class VideoDecoderFactory: RTCDefaultVideoDecoderFactory {
-
-    override func supportedCodecs() -> [RTCVideoCodecInfo] {
+private class VideoDecoderFactory: LKRTCDefaultVideoDecoderFactory {
+    override func supportedCodecs() -> [LKRTCVideoCodecInfo] {
         super.supportedCodecs().rewriteCodecsIfNeeded()
     }
 }
 
-private class VideoEncoderFactorySimulcast: RTCVideoEncoderFactorySimulcast {
-
-    override func supportedCodecs() -> [RTCVideoCodecInfo] {
+private class VideoEncoderFactorySimulcast: LKRTCVideoEncoderFactorySimulcast {
+    override func supportedCodecs() -> [LKRTCVideoCodecInfo] {
         super.supportedCodecs().rewriteCodecsIfNeeded()
     }
 }
 
-internal extension Engine {
-
+extension Engine {
     static var bypassVoiceProcessing: Bool = false
 
-    static let h264BaselineLevel5CodecInfo: RTCVideoCodecInfo = {
-
+    static let h264BaselineLevel5CodecInfo: LKRTCVideoCodecInfo = {
         // this should never happen
-        guard let profileLevelId = RTCH264ProfileLevelId(profile: .constrainedBaseline, level: .level5) else {
+        guard let profileLevelId = LKRTCH264ProfileLevelId(profile: .constrainedBaseline, level: .level5) else {
             logger.log("failed to generate profileLevelId", .error, type: Engine.self)
             fatalError("failed to generate profileLevelId")
         }
 
         // create a new H264 codec with new profileLevelId
-        return RTCVideoCodecInfo(name: kRTCH264CodecName,
-                                 parameters: ["profile-level-id": profileLevelId.hexString,
-                                              "level-asymmetry-allowed": "1",
-                                              "packetization-mode": "1"])
+        return LKRTCVideoCodecInfo(name: kRTCH264CodecName,
+                                   parameters: ["profile-level-id": profileLevelId.hexString,
+                                                "level-asymmetry-allowed": "1",
+                                                "packetization-mode": "1"])
     }()
 
     // global properties are already lazy
 
-    static private let encoderFactory: RTCVideoEncoderFactory = {
+    private static let encoderFactory: LKRTCVideoEncoderFactory = {
         let encoderFactory = VideoEncoderFactory()
-        #if LK_USE_LIVEKIT_WEBRTC_BUILD
         return VideoEncoderFactorySimulcast(primary: encoderFactory,
                                             fallback: encoderFactory)
 
-        #else
-        return encoderFactory
-        #endif
     }()
 
-    static private let decoderFactory = VideoDecoderFactory()
+    private static let decoderFactory = VideoDecoderFactory()
 
-    static let peerConnectionFactory: RTCPeerConnectionFactory = {
+    static let audioProcessingModule: LKRTCDefaultAudioProcessingModule = .init()
 
+    static let videoSenderCapabilities = peerConnectionFactory.rtpSenderCapabilities(for: .video)
+    static let audioSenderCapabilities = peerConnectionFactory.rtpSenderCapabilities(for: .audio)
+
+    static let peerConnectionFactory: LKRTCPeerConnectionFactory = {
         logger.log("Initializing SSL...", type: Engine.self)
 
         RTCInitializeSSL()
@@ -96,96 +90,95 @@ internal extension Engine {
 
         logger.log("Initializing PeerConnectionFactory...", type: Engine.self)
 
-        #if LK_USE_LIVEKIT_WEBRTC_BUILD
-        return RTCPeerConnectionFactory(bypassVoiceProcessing: bypassVoiceProcessing,
-                                        encoderFactory: encoderFactory,
-                                        decoderFactory: decoderFactory)
-        #else
-        return RTCPeerConnectionFactory(encoderFactory: encoderFactory,
-                                        decoderFactory: decoderFactory)
-        #endif
+        return LKRTCPeerConnectionFactory(bypassVoiceProcessing: bypassVoiceProcessing,
+                                          encoderFactory: encoderFactory,
+                                          decoderFactory: decoderFactory,
+                                          audioProcessingModule: audioProcessingModule)
     }()
 
     // forbid direct access
 
-    static var audioDeviceModule: RTCAudioDeviceModule {
+    static var audioDeviceModule: LKRTCAudioDeviceModule {
         peerConnectionFactory.audioDeviceModule
     }
 
-    static func createPeerConnection(_ configuration: RTCConfiguration,
-                                     constraints: RTCMediaConstraints) -> RTCPeerConnection? {
-        DispatchQueue.webRTC.sync { peerConnectionFactory.peerConnection(with: configuration,
-                                                                         constraints: constraints,
-                                                                         delegate: nil) }
+    static func createPeerConnection(_ configuration: LKRTCConfiguration,
+                                     constraints: LKRTCMediaConstraints) -> LKRTCPeerConnection?
+    {
+        DispatchQueue.liveKitWebRTC.sync { peerConnectionFactory.peerConnection(with: configuration,
+                                                                                constraints: constraints,
+                                                                                delegate: nil) }
     }
 
-    static func createVideoSource(forScreenShare: Bool) -> RTCVideoSource {
-        #if LK_USE_LIVEKIT_WEBRTC_BUILD
-        DispatchQueue.webRTC.sync { peerConnectionFactory.videoSource(forScreenCast: forScreenShare) }
-        #else
-        DispatchQueue.webRTC.sync { peerConnectionFactory.videoSource() }
-        #endif
+    static func createVideoSource(forScreenShare: Bool) -> LKRTCVideoSource {
+        DispatchQueue.liveKitWebRTC.sync { peerConnectionFactory.videoSource(forScreenCast: forScreenShare) }
     }
 
-    static func createVideoTrack(source: RTCVideoSource) -> RTCVideoTrack {
-        DispatchQueue.webRTC.sync { peerConnectionFactory.videoTrack(with: source,
-                                                                     trackId: UUID().uuidString) }
+    static func createVideoTrack(source: LKRTCVideoSource) -> LKRTCVideoTrack {
+        DispatchQueue.liveKitWebRTC.sync { peerConnectionFactory.videoTrack(with: source,
+                                                                            trackId: UUID().uuidString) }
     }
 
-    static func createAudioSource(_ constraints: RTCMediaConstraints?) -> RTCAudioSource {
-        DispatchQueue.webRTC.sync { peerConnectionFactory.audioSource(with: constraints) }
+    static func createAudioSource(_ constraints: LKRTCMediaConstraints?) -> LKRTCAudioSource {
+        DispatchQueue.liveKitWebRTC.sync { peerConnectionFactory.audioSource(with: constraints) }
     }
 
-    static func createAudioTrack(source: RTCAudioSource) -> RTCAudioTrack {
-        DispatchQueue.webRTC.sync { peerConnectionFactory.audioTrack(with: source,
-                                                                     trackId: UUID().uuidString) }
+    static func createAudioTrack(source: LKRTCAudioSource) -> LKRTCAudioTrack {
+        DispatchQueue.liveKitWebRTC.sync { peerConnectionFactory.audioTrack(with: source,
+                                                                            trackId: UUID().uuidString) }
     }
 
     static func createDataChannelConfiguration(ordered: Bool = true,
-                                               maxRetransmits: Int32 = -1) -> RTCDataChannelConfiguration {
-        let result = DispatchQueue.webRTC.sync { RTCDataChannelConfiguration() }
+                                               maxRetransmits: Int32 = -1) -> LKRTCDataChannelConfiguration
+    {
+        let result = DispatchQueue.liveKitWebRTC.sync { LKRTCDataChannelConfiguration() }
         result.isOrdered = ordered
         result.maxRetransmits = maxRetransmits
         return result
     }
 
-    static func createDataBuffer(data: Data) -> RTCDataBuffer {
-        DispatchQueue.webRTC.sync { RTCDataBuffer(data: data, isBinary: true) }
+    static func createDataBuffer(data: Data) -> LKRTCDataBuffer {
+        DispatchQueue.liveKitWebRTC.sync { LKRTCDataBuffer(data: data, isBinary: true) }
     }
 
-    static func createIceCandidate(fromJsonString: String) throws -> RTCIceCandidate {
-        try DispatchQueue.webRTC.sync { try RTCIceCandidate(fromJsonString: fromJsonString) }
+    static func createIceCandidate(fromJsonString: String) throws -> LKRTCIceCandidate {
+        try DispatchQueue.liveKitWebRTC.sync { try LKRTCIceCandidate(fromJsonString: fromJsonString) }
     }
 
-    static func createSessionDescription(type: RTCSdpType, sdp: String) -> RTCSessionDescription {
-        DispatchQueue.webRTC.sync { RTCSessionDescription(type: type, sdp: sdp) }
+    static func createSessionDescription(type: RTCSdpType, sdp: String) -> LKRTCSessionDescription {
+        DispatchQueue.liveKitWebRTC.sync { LKRTCSessionDescription(type: type, sdp: sdp) }
     }
 
-    static func createVideoCapturer() -> RTCVideoCapturer {
-        DispatchQueue.webRTC.sync { RTCVideoCapturer() }
+    static func createVideoCapturer() -> LKRTCVideoCapturer {
+        DispatchQueue.liveKitWebRTC.sync { LKRTCVideoCapturer() }
     }
 
     static func createRtpEncodingParameters(rid: String? = nil,
                                             encoding: MediaEncoding? = nil,
                                             scaleDownBy: Double? = nil,
-                                            active: Bool = true) -> RTCRtpEncodingParameters {
-
-        let result = DispatchQueue.webRTC.sync { RTCRtpEncodingParameters() }
+                                            active: Bool = true,
+                                            scalabilityMode: ScalabilityMode? = nil) -> LKRTCRtpEncodingParameters
+    {
+        let result = DispatchQueue.liveKitWebRTC.sync { LKRTCRtpEncodingParameters() }
 
         result.isActive = active
         result.rid = rid
 
-        if let scaleDownBy = scaleDownBy {
+        if let scaleDownBy {
             result.scaleResolutionDownBy = NSNumber(value: scaleDownBy)
         }
 
-        if let encoding = encoding {
+        if let encoding {
             result.maxBitrateBps = NSNumber(value: encoding.maxBitrate)
 
             // VideoEncoding specific
             if let videoEncoding = encoding as? VideoEncoding {
                 result.maxFramerate = NSNumber(value: videoEncoding.maxFps)
             }
+        }
+
+        if let scalabilityMode {
+            result.scalabilityMode = scalabilityMode.rawStringValue
         }
 
         return result

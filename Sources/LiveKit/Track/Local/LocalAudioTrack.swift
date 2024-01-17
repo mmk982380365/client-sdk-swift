@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 LiveKit
+ * Copyright 2024 LiveKit
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,25 +15,27 @@
  */
 
 import Foundation
-import WebRTC
-import Promises
+
+@_implementationOnly import WebRTC
 
 @objc
 public class LocalAudioTrack: Track, LocalTrack, AudioTrack {
-
-    internal init(name: String,
-                  source: Track.Source,
-                  track: RTCMediaStreamTrack) {
-
+    init(name: String,
+         source: Track.Source,
+         track: LKRTCMediaStreamTrack,
+         reportStatistics: Bool)
+    {
         super.init(name: name,
                    kind: .audio,
                    source: source,
-                   track: track)
+                   track: track,
+                   reportStatistics: reportStatistics)
     }
 
     public static func createTrack(name: String = Track.microphoneName,
-                                   options: AudioCaptureOptions? = nil) -> LocalAudioTrack {
-
+                                   options: AudioCaptureOptions? = nil,
+                                   reportStatistics: Bool = false) -> LocalAudioTrack
+    {
         let options = options ?? AudioCaptureOptions()
 
         let constraints: [String: String] = [
@@ -43,11 +45,11 @@ public class LocalAudioTrack: Track, LocalTrack, AudioTrack {
             "googTypingNoiseDetection": options.typingNoiseDetection.toString(),
             "googHighpassFilter": options.highpassFilter.toString(),
             "googNoiseSuppression2": options.experimentalNoiseSuppression.toString(),
-            "googAutoGainControl2": options.experimentalAutoGainControl.toString()
+            "googAutoGainControl2": options.experimentalAutoGainControl.toString(),
         ]
 
-        let audioConstraints = DispatchQueue.webRTC.sync { RTCMediaConstraints(mandatoryConstraints: nil,
-                                                                               optionalConstraints: constraints) }
+        let audioConstraints = DispatchQueue.liveKitWebRTC.sync { LKRTCMediaConstraints(mandatoryConstraints: nil,
+                                                                                        optionalConstraints: constraints) }
 
         let audioSource = Engine.createAudioSource(audioConstraints)
         let rtcTrack = Engine.createAudioTrack(source: audioSource)
@@ -55,33 +57,39 @@ public class LocalAudioTrack: Track, LocalTrack, AudioTrack {
 
         return LocalAudioTrack(name: name,
                                source: .microphone,
-                               track: rtcTrack)
+                               track: rtcTrack,
+                               reportStatistics: reportStatistics)
     }
 
     @discardableResult
-    internal override func onPublish() -> Promise<Bool> {
-        super.onPublish().then(on: queue) { didPublish -> Bool in
-            if didPublish {
-                AudioManager.shared.trackDidStart(.local)
-            }
-            return didPublish
+    override func onPublish() async throws -> Bool {
+        let didPublish = try await super.onPublish()
+        if didPublish {
+            AudioManager.shared.trackDidStart(.local)
         }
+        return didPublish
     }
 
     @discardableResult
-    internal override func onUnpublish() -> Promise<Bool> {
-        super.onUnpublish().then(on: queue) { didUnpublish -> Bool in
-            if didUnpublish {
-                AudioManager.shared.trackDidStop(.local)
-            }
-            return didUnpublish
+    override func onUnpublish() async throws -> Bool {
+        let didUnpublish = try await super.onUnpublish()
+        if didUnpublish {
+            AudioManager.shared.trackDidStop(.local)
         }
+        return didUnpublish
+    }
+
+    public func mute() async throws {
+        try await super._mute()
+    }
+
+    public func unmute() async throws {
+        try await super._unmute()
     }
 }
 
-extension LocalAudioTrack {
+public extension LocalAudioTrack {
+    var publishOptions: PublishOptions? { super._publishOptions }
 
-    public var publishOptions: PublishOptions? { super._publishOptions }
-
-    public var publishState: Track.PublishState { super._publishState }
+    var publishState: Track.PublishState { super._publishState }
 }

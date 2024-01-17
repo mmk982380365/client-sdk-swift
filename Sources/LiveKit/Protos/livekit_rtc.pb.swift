@@ -7,6 +7,20 @@
 // For information on using the generated types, please see the documentation:
 //   https://github.com/apple/swift-protobuf/
 
+// Copyright 2023 LiveKit, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 import Foundation
 import SwiftProtobuf
 
@@ -52,7 +66,7 @@ enum Livekit_SignalTarget: SwiftProtobuf.Enum {
 
 extension Livekit_SignalTarget: CaseIterable {
   // The compiler won't synthesize support with the UNRECOGNIZED case.
-  static var allCases: [Livekit_SignalTarget] = [
+  static let allCases: [Livekit_SignalTarget] = [
     .publisher,
     .subscriber,
   ]
@@ -92,7 +106,7 @@ enum Livekit_StreamState: SwiftProtobuf.Enum {
 
 extension Livekit_StreamState: CaseIterable {
   // The compiler won't synthesize support with the UNRECOGNIZED case.
-  static var allCases: [Livekit_StreamState] = [
+  static let allCases: [Livekit_StreamState] = [
     .active,
     .paused,
   ]
@@ -135,7 +149,7 @@ enum Livekit_CandidateProtocol: SwiftProtobuf.Enum {
 
 extension Livekit_CandidateProtocol: CaseIterable {
   // The compiler won't synthesize support with the UNRECOGNIZED case.
-  static var allCases: [Livekit_CandidateProtocol] = [
+  static let allCases: [Livekit_CandidateProtocol] = [
     .udp,
     .tcp,
     .tls,
@@ -725,8 +739,6 @@ struct Livekit_SimulcastCodec {
   var codec: String = String()
 
   var cid: String = String()
-
-  var enableSimulcastLayers: Bool = false
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -2301,7 +2313,6 @@ extension Livekit_SimulcastCodec: SwiftProtobuf.Message, SwiftProtobuf._MessageI
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "codec"),
     2: .same(proto: "cid"),
-    3: .standard(proto: "enable_simulcast_layers"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -2312,7 +2323,6 @@ extension Livekit_SimulcastCodec: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.codec) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.cid) }()
-      case 3: try { try decoder.decodeSingularBoolField(value: &self.enableSimulcastLayers) }()
       default: break
       }
     }
@@ -2325,16 +2335,12 @@ extension Livekit_SimulcastCodec: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if !self.cid.isEmpty {
       try visitor.visitSingularStringField(value: self.cid, fieldNumber: 2)
     }
-    if self.enableSimulcastLayers != false {
-      try visitor.visitSingularBoolField(value: self.enableSimulcastLayers, fieldNumber: 3)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: Livekit_SimulcastCodec, rhs: Livekit_SimulcastCodec) -> Bool {
     if lhs.codec != rhs.codec {return false}
     if lhs.cid != rhs.cid {return false}
-    if lhs.enableSimulcastLayers != rhs.enableSimulcastLayers {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

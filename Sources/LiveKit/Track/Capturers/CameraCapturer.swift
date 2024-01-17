@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 LiveKit
+ * Copyright 2024 LiveKit
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,20 +15,17 @@
  */
 
 import Foundation
-import WebRTC
-import Promises
 
 #if canImport(ReplayKit)
-import ReplayKit
+    import ReplayKit
 #endif
 
+@_implementationOnly import WebRTC
+
 public class CameraCapturer: VideoCapturer {
-
-    private let capturer: RTCCameraVideoCapturer
-
     @objc
     public static func captureDevices() -> [AVCaptureDevice] {
-        DispatchQueue.webRTC.sync { RTCCameraVideoCapturer.captureDevices() }
+        DispatchQueue.liveKitWebRTC.sync { LKRTCCameraVideoCapturer.captureDevices() }
     }
 
     /// Checks whether both front and back capturing devices exist, and can be switched.
@@ -51,182 +48,211 @@ public class CameraCapturer: VideoCapturer {
     @objc
     public var options: CameraCaptureOptions
 
-    init(delegate: RTCVideoCapturerDelegate, options: CameraCaptureOptions) {
-        self.capturer = DispatchQueue.webRTC.sync { RTCCameraVideoCapturer(delegate: delegate) }
+    public var isMultitaskingAccessSupported: Bool {
+        #if os(iOS) || os(tvOS)
+            if #available(iOS 16, *, tvOS 17, *) {
+                self.capturer.captureSession.beginConfiguration()
+                defer { self.capturer.captureSession.commitConfiguration() }
+                return self.capturer.captureSession.isMultitaskingCameraAccessSupported
+            }
+        #endif
+        return false
+    }
+
+    public var isMultitaskingAccessEnabled: Bool {
+        get {
+            #if os(iOS) || os(tvOS)
+                if #available(iOS 16, *, tvOS 17, *) {
+                    return self.capturer.captureSession.isMultitaskingCameraAccessEnabled
+                }
+            #endif
+            return false
+        }
+        set {
+            #if os(iOS) || os(tvOS)
+                if #available(iOS 16, *, tvOS 17, *) {
+                    self.capturer.captureSession.isMultitaskingCameraAccessEnabled = newValue
+                }
+            #endif
+        }
+    }
+
+    // Used to hide LKRTCVideoCapturerDelegate symbol
+    private lazy var adapter: VideoCapturerDelegateAdapter = .init(cameraCapturer: self)
+
+    // RTCCameraVideoCapturer used internally for now
+    private lazy var capturer: LKRTCCameraVideoCapturer = DispatchQueue.liveKitWebRTC.sync { LKRTCCameraVideoCapturer(delegate: adapter) }
+
+    init(delegate: LKRTCVideoCapturerDelegate, options: CameraCaptureOptions) {
         self.options = options
         super.init(delegate: delegate)
+
+        log("isMultitaskingAccessSupported: \(isMultitaskingAccessSupported)", .info)
     }
 
     /// Switches the camera position between `.front` and `.back` if supported by the device.
+    @objc
     @discardableResult
-    public func switchCameraPosition() -> Promise<Bool> {
-        // cannot toggle if current position is unknown
+    public func switchCameraPosition() async throws -> Bool {
+        // Cannot toggle if current position is unknown
         guard position != .unspecified else {
-            log("Failed to toggle camera position", .warning)
-            return Promise(TrackError.state(message: "Camera position unknown"))
+            log("Failed to toggle camera position", .error)
+            throw LiveKitError(.invalidState, message: "Failed to toggle camera position")
         }
 
-        return setCameraPosition(position == .front ? .back : .front)
+        return try await set(cameraPosition: position == .front ? .back : .front)
     }
 
     /// Sets the camera's position to `.front` or `.back` when supported
-    public func setCameraPosition(_ position: AVCaptureDevice.Position) -> Promise<Bool> {
-
-        log("setCameraPosition(position: \(position)")
+    @objc
+    @discardableResult
+    public func set(cameraPosition position: AVCaptureDevice.Position) async throws -> Bool {
+        log("set(cameraPosition:) \(position)")
 
         // update options to use new position
         options = options.copyWith(position: position)
 
-        // restart capturer
-        return restartCapture()
+        // Restart capturer
+        return try await restartCapture()
     }
 
-    public override func startCapture() -> Promise<Bool> {
+    override public func startCapture() async throws -> Bool {
+        let didStart = try await super.startCapture()
 
-        super.startCapture().then(on: queue) { didStart -> Promise<Bool> in
+        // Already started
+        guard didStart else { return false }
 
-            guard didStart else {
-                // already started
-                return Promise(false)
-            }
+        let preferredPixelFormat = capturer.preferredOutputPixelFormat()
+        log("CameraCapturer.preferredPixelFormat: \(preferredPixelFormat.toString())")
 
-            let preferredPixelFormat = self.capturer.preferredOutputPixelFormat()
-            self.log("CameraCapturer.preferredPixelFormat: \(preferredPixelFormat.toString())")
+        let devices = CameraCapturer.captureDevices()
+        // TODO: FaceTime Camera for macOS uses .unspecified, fall back to first device
 
-            let devices = CameraCapturer.captureDevices()
-            // TODO: FaceTime Camera for macOS uses .unspecified, fall back to first device
+        guard let device = devices.first(where: { $0.position == self.options.position }) ?? devices.first else {
+            log("No camera video capture devices available", .error)
+            throw LiveKitError(.deviceNotFound, message: "No camera video capture devices available")
+        }
 
-            guard let device = devices.first(where: { $0.position == self.options.position }) ?? devices.first else {
-                self.log("No camera video capture devices available", .error)
-                throw TrackError.capturer(message: "No camera video capture devices available")
-            }
+        // list of all formats in order of dimensions size
+        let formats = DispatchQueue.liveKitWebRTC.sync { LKRTCCameraVideoCapturer.supportedFormats(for: device) }
+        // create an array of sorted touples by dimensions size
+        let sortedFormats = formats.map { (format: $0, dimensions: Dimensions(from: CMVideoFormatDescriptionGetDimensions($0.formatDescription))) }
+            .sorted { $0.dimensions.area < $1.dimensions.area }
 
-            // list of all formats in order of dimensions size
-            let formats = DispatchQueue.webRTC.sync { RTCCameraVideoCapturer.supportedFormats(for: device) }
-            // create an array of sorted touples by dimensions size
-            let sortedFormats = formats.map({ (format: $0, dimensions: Dimensions(from: CMVideoFormatDescriptionGetDimensions($0.formatDescription))) })
-                .sorted { $0.dimensions.area < $1.dimensions.area }
+        log("sortedFormats: \(sortedFormats.map { "(dimensions: \(String(describing: $0.dimensions)), fps: \(String(describing: $0.format.fpsRange())))" }), target dimensions: \(options.dimensions)")
 
-            // default to the smallest
-            var selectedFormat = sortedFormats.first
+        // default to the largest supported dimensions (backup)
+        var selectedFormat = sortedFormats.last
 
-            // find preferred capture format if specified in options
-            if let preferredFormat = self.options.preferredFormat,
-               let foundFormat = sortedFormats.first(where: { $0.format == preferredFormat }) {
+        if let preferredFormat = options.preferredFormat,
+           let foundFormat = sortedFormats.first(where: { $0.format == preferredFormat })
+        {
+            // Use the preferred capture format if specified in options
+            selectedFormat = foundFormat
+        } else {
+            if let foundFormat = sortedFormats.first(where: { $0.dimensions.area >= self.options.dimensions.area && $0.format.fpsRange().contains(self.options.fps) }) {
+                // Use the first format that satisfies preferred dimensions & fps
                 selectedFormat = foundFormat
-            } else {
-                self.log("formats: \(sortedFormats.map { String(describing: $0.format.fpsRange()) }), target: \(self.options.dimensions)")
-
-                // find format that satisfies preferred dimensions & fps
-                selectedFormat = sortedFormats.first(where: { $0.dimensions.area >= self.options.dimensions.area && $0.format.fpsRange().contains(self.options.fps) })
-
-                // give up FPS if format still not found
-                if selectedFormat == nil {
-                    selectedFormat = sortedFormats.first(where: { $0.dimensions.area >= self.options.dimensions.area })
-                }
-            }
-
-            // format should be resolved at this point
-            guard let selectedFormat = selectedFormat else {
-                self.log("Unable to resolve format", .error)
-                throw TrackError.capturer(message: "Unable to determine format for camera capturer")
-            }
-
-            let fpsRange = selectedFormat.format.fpsRange()
-
-            // this should never happen
-            guard fpsRange != 0...0 else {
-                self.log("unable to resolve fps range", .error)
-                throw TrackError.capturer(message: "Unable to determine supported fps range for format: \(selectedFormat)")
-            }
-
-            // default to fps in options
-            var selectedFps = self.options.fps
-
-            if !fpsRange.contains(selectedFps) {
-                // log a warning, but continue
-                self.log("requested fps: \(self.options.fps) is out of range: \(fpsRange) and will be clamped", .warning)
-                // clamp to supported fps range
-                selectedFps = selectedFps.clamped(to: fpsRange)
-            }
-
-            self.log("starting camera capturer device: \(device), format: \(selectedFormat), fps: \(selectedFps)(\(fpsRange))", .info)
-
-            // adapt if requested dimensions and camera's dimensions don't match
-            if let videoSource = self.delegate as? RTCVideoSource,
-               selectedFormat.dimensions != self.options.dimensions {
-
-                // self.log("adaptOutputFormat to: \(options.dimensions) fps: \(self.options.fps)")
-                videoSource.adaptOutputFormat(toWidth: self.options.dimensions.width,
-                                              height: self.options.dimensions.height,
-                                              fps: Int32(self.options.fps))
-            }
-
-            // return promise that waits for capturer to start
-            return Promise<Bool>(on: .webRTC) { resolve, fail in
-                // start the RTCCameraVideoCapturer
-                self.capturer.startCapture(with: device, format: selectedFormat.format, fps: selectedFps) { error in
-                    if let error = error {
-                        self.log("CameraCapturer failed to start \(error)", .error)
-                        fail(error)
-                        return
-                    }
-
-                    // update internal vars
-                    self.device = device
-                    // this will trigger to re-compute encodings for sender parameters if dimensions have updated
-                    self.dimensions = self.options.dimensions
-
-                    // successfully started
-                    resolve(true)
-                }
+            } else if let foundFormat = sortedFormats.first(where: { $0.dimensions.area >= self.options.dimensions.area }) {
+                // Use the first format that satisfies preferred dimensions (without fps)
+                selectedFormat = foundFormat
             }
         }
+
+        // format should be resolved at this point
+        guard let selectedFormat else {
+            log("Unable to resolve capture format", .error)
+            throw LiveKitError(.captureFormatNotFound, message: "Unable to resolve capture format")
+        }
+
+        let fpsRange = selectedFormat.format.fpsRange()
+
+        // this should never happen
+        guard fpsRange != 0 ... 0 else {
+            log("Unable to determine supported fps range for format: \(selectedFormat)", .error)
+            throw LiveKitError(.unableToResolveFPSRange, message: "Unable to determine supported fps range for format: \(selectedFormat)")
+        }
+
+        // default to fps in options
+        var selectedFps = options.fps
+
+        if !fpsRange.contains(selectedFps) {
+            // log a warning, but continue
+            log("requested fps: \(options.fps) is out of range: \(fpsRange) and will be clamped", .warning)
+            // clamp to supported fps range
+            selectedFps = selectedFps.clamped(to: fpsRange)
+        }
+
+        log("starting camera capturer device: \(device), format: \(selectedFormat), fps: \(selectedFps)(\(fpsRange))", .info)
+
+        // adapt if requested dimensions and camera's dimensions don't match
+        if let videoSource = delegate as? LKRTCVideoSource,
+           selectedFormat.dimensions != self.options.dimensions
+        {
+            // self.log("adaptOutputFormat to: \(options.dimensions) fps: \(self.options.fps)")
+            videoSource.adaptOutputFormat(toWidth: options.dimensions.width,
+                                          height: options.dimensions.height,
+                                          fps: Int32(options.fps))
+        }
+
+        try await capturer.startCapture(with: device, format: selectedFormat.format, fps: selectedFps)
+
+        // Update internal vars
+        self.device = device
+
+        return true
     }
 
-    public override func stopCapture() -> Promise<Bool> {
+    override public func stopCapture() async throws -> Bool {
+        let didStop = try await super.stopCapture()
 
-        super.stopCapture().then(on: queue) { didStop -> Promise<Bool> in
+        // Already stopped
+        guard didStop else { return false }
 
-            guard didStop else {
-                // already stopped
-                return Promise(false)
-            }
+        await capturer.stopCapture()
 
-            return Promise<Bool>(on: .webRTC) { resolve, _ in
-                // stop the RTCCameraVideoCapturer
-                self.capturer.stopCapture {
-                    // update internal vars
-                    self.device = nil
-                    self.dimensions = nil
+        // Update internal vars
+        device = nil
+        dimensions = nil
 
-                    // successfully stopped
-                    resolve(true)
-                }
-            }
-        }
+        return true
     }
 }
 
-extension LocalVideoTrack {
+class VideoCapturerDelegateAdapter: NSObject, LKRTCVideoCapturerDelegate {
+    weak var cameraCapturer: CameraCapturer?
 
+    init(cameraCapturer: CameraCapturer? = nil) {
+        self.cameraCapturer = cameraCapturer
+    }
+
+    func capturer(_ capturer: LKRTCVideoCapturer, didCapture frame: LKRTCVideoFrame) {
+        guard let cameraCapturer else { return }
+        // Resolve real dimensions (apply frame rotation)
+        cameraCapturer.dimensions = Dimensions(width: frame.width, height: frame.height).apply(rotation: frame.rotation)
+        // Pass frame to video source
+        cameraCapturer.delegate?.capturer(capturer, didCapture: frame)
+    }
+}
+
+public extension LocalVideoTrack {
     @objc
-    public static func createCameraTrack() -> LocalVideoTrack {
+    static func createCameraTrack() -> LocalVideoTrack {
         createCameraTrack(name: nil, options: nil)
     }
 
     @objc
-    public static func createCameraTrack(name: String? = nil,
-                                         options: CameraCaptureOptions? = nil) -> LocalVideoTrack {
-
+    static func createCameraTrack(name: String? = nil,
+                                  options: CameraCaptureOptions? = nil,
+                                  reportStatistics: Bool = false) -> LocalVideoTrack
+    {
         let videoSource = Engine.createVideoSource(forScreenShare: false)
         let capturer = CameraCapturer(delegate: videoSource, options: options ?? CameraCaptureOptions())
-        return LocalVideoTrack(
-            name: name ?? Track.cameraName,
-            source: .camera,
-            capturer: capturer,
-            videoSource: videoSource
-        )
+        return LocalVideoTrack(name: name ?? Track.cameraName,
+                               source: .camera,
+                               capturer: capturer,
+                               videoSource: videoSource,
+                               reportStatistics: reportStatistics)
     }
 }
 
@@ -242,27 +268,23 @@ extension AVCaptureDevice.Position: CustomStringConvertible {
 }
 
 extension Comparable {
-
     // clamp a value within the range
     func clamped(to limits: ClosedRange<Self>) -> Self {
-        return min(max(self, limits.lowerBound), limits.upperBound)
+        min(max(self, limits.lowerBound), limits.upperBound)
     }
 }
 
 extension AVFrameRateRange {
-
     // convert to a ClosedRange
     func toRange() -> ClosedRange<Int> {
-        Int(minFrameRate)...Int(maxFrameRate)
+        Int(minFrameRate) ... Int(maxFrameRate)
     }
 }
 
 extension AVCaptureDevice.Format {
-
     // computes a ClosedRange of supported FPSs for this format
     func fpsRange() -> ClosedRange<Int> {
-
-        videoSupportedFrameRateRanges.map { $0.toRange() }.reduce(into: 0...0) { result, current in
+        videoSupportedFrameRateRanges.map { $0.toRange() }.reduce(into: 0 ... 0) { result, current in
             result = merge(range: result, with: current)
         }
     }
