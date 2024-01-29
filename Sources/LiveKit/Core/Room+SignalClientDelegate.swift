@@ -256,9 +256,9 @@ extension Room: SignalClientDelegate {
     }
 
     func signalClient(_: SignalClient, didMutateState _: SignalClient.State, oldState _: SignalClient.State) {}
-    func signalClient(_: SignalClient, didReceiveAnswer _: LKRTCSessionDescription) {}
-    func signalClient(_: SignalClient, didReceiveOffer _: LKRTCSessionDescription) {}
-    func signalClient(_: SignalClient, didReceiveIceCandidate _: LKRTCIceCandidate, target _: Livekit_SignalTarget) {}
+    func signalClient(_: SignalClient, didReceiveAnswer _: RTCSessionDescription) {}
+    func signalClient(_: SignalClient, didReceiveOffer _: RTCSessionDescription) {}
+    func signalClient(_: SignalClient, didReceiveIceCandidate _: RTCIceCandidate, target _: Livekit_SignalTarget) {}
     func signalClient(_: SignalClient, didPublishLocalTrack _: Livekit_TrackPublishedResponse) {}
     func signalClient(_: SignalClient, didUpdateToken _: String) {}
 }

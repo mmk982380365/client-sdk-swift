@@ -35,7 +35,7 @@ public protocol VideoRenderer {
     func render(frame: VideoFrame)
 }
 
-class VideoRendererAdapter: NSObject, LKRTCVideoRenderer {
+class VideoRendererAdapter: NSObject, RTCVideoRenderer {
     private weak var target: VideoRenderer?
 
     init(target: VideoRenderer) {
@@ -46,7 +46,7 @@ class VideoRendererAdapter: NSObject, LKRTCVideoRenderer {
         target?.set(size: size)
     }
 
-    func renderFrame(_ frame: LKRTCVideoFrame?) {
+    func renderFrame(_ frame: RTCVideoFrame?) {
         guard let frame = frame?.toLKType() else { return }
         target?.render(frame: frame)
     }

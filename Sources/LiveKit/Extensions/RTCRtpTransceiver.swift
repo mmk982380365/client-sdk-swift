@@ -18,7 +18,7 @@ import Foundation
 
 @_implementationOnly import WebRTC
 
-extension LKRTCRtpTransceiver: Loggable {
+extension RTCRtpTransceiver: Loggable {
     /// Attempts to set preferred video codec.
     func set(preferredVideoCodec codec: VideoCodec, exceptCodec: VideoCodec? = nil) {
         // Get list of supported codecs...

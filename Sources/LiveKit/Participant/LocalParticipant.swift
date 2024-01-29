@@ -73,9 +73,9 @@ public class LocalParticipant: Participant {
                 dimensions = try await track.capturer.dimensionsCompleter.wait()
             }
 
-            let populatorFunc: SignalClient.AddTrackRequestPopulator<LKRTCRtpTransceiverInit> = { populator in
+            let populatorFunc: SignalClient.AddTrackRequestPopulator<RTCRtpTransceiverInit> = { populator in
 
-                let transInit = DispatchQueue.liveKitWebRTC.sync { LKRTCRtpTransceiverInit() }
+                let transInit = DispatchQueue.liveKitWebRTC.sync { RTCRtpTransceiverInit() }
                 transInit.direction = .sendOnly
 
                 if let track = track as? LocalVideoTrack {
@@ -569,7 +569,7 @@ extension LocalParticipant {
 
         // Add transceiver first...
 
-        let transInit = DispatchQueue.liveKitWebRTC.sync { LKRTCRtpTransceiverInit() }
+        let transInit = DispatchQueue.liveKitWebRTC.sync { RTCRtpTransceiverInit() }
         transInit.direction = .sendOnly
         transInit.sendEncodings = encodings
 

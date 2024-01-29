@@ -22,29 +22,29 @@ import Foundation
 public protocol VideoBuffer {}
 
 protocol RTCCompatibleVideoBuffer {
-    func toRTCType() -> LKRTCVideoFrameBuffer
+    func toRTCType() -> RTCVideoFrameBuffer
 }
 
 public class CVPixelVideoBuffer: VideoBuffer, RTCCompatibleVideoBuffer {
     // Internal RTC type
-    let rtcType: LKRTCCVPixelBuffer
-    init(rtcCVPixelBuffer: LKRTCCVPixelBuffer) {
+    let rtcType: RTCCVPixelBuffer
+    init(rtcCVPixelBuffer: RTCCVPixelBuffer) {
         rtcType = rtcCVPixelBuffer
     }
 
-    func toRTCType() -> LKRTCVideoFrameBuffer {
+    func toRTCType() -> RTCVideoFrameBuffer {
         rtcType
     }
 }
 
 public struct I420VideoBuffer: VideoBuffer, RTCCompatibleVideoBuffer {
     // Internal RTC type
-    let rtcType: LKRTCI420Buffer
-    init(rtcI420Buffer: LKRTCI420Buffer) {
+    let rtcType: RTCI420Buffer
+    init(rtcI420Buffer: RTCI420Buffer) {
         rtcType = rtcI420Buffer
     }
 
-    func toRTCType() -> LKRTCVideoFrameBuffer {
+    func toRTCType() -> RTCVideoFrameBuffer {
         rtcType
     }
 }
@@ -69,13 +69,13 @@ public class VideoFrame: NSObject {
     }
 }
 
-extension LKRTCVideoFrame {
+extension RTCVideoFrame {
     func toLKType() -> VideoFrame? {
         let lkBuffer: VideoBuffer
 
-        if let rtcBuffer = buffer as? LKRTCCVPixelBuffer {
+        if let rtcBuffer = buffer as? RTCCVPixelBuffer {
             lkBuffer = CVPixelVideoBuffer(rtcCVPixelBuffer: rtcBuffer)
-        } else if let rtcI420Buffer = buffer as? LKRTCI420Buffer {
+        } else if let rtcI420Buffer = buffer as? RTCI420Buffer {
             lkBuffer = I420VideoBuffer(rtcI420Buffer: rtcI420Buffer)
         } else {
             logger.error("RTCVideoFrame.buffer is not a known type (\(type(of: buffer)))")
@@ -90,12 +90,12 @@ extension LKRTCVideoFrame {
 }
 
 extension VideoFrame {
-    func toRTCType() -> LKRTCVideoFrame {
+    func toRTCType() -> RTCVideoFrame {
         // This should never happen
         guard let buffer = buffer as? RTCCompatibleVideoBuffer else { fatalError("Buffer must be a RTCCompatibleVideoBuffer") }
 
-        return LKRTCVideoFrame(buffer: buffer.toRTCType(),
-                               rotation: rotation.toRTCType(),
-                               timeStampNs: timeStampNs)
+        return RTCVideoFrame(buffer: buffer.toRTCType(),
+                             rotation: rotation.toRTCType(),
+                             timeStampNs: timeStampNs)
     }
 }

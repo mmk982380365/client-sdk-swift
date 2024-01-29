@@ -36,7 +36,7 @@ extension Engine: SignalClientDelegate {
         }
     }
 
-    func signalClient(_: SignalClient, didReceiveIceCandidate iceCandidate: LKRTCIceCandidate, target: Livekit_SignalTarget) {
+    func signalClient(_: SignalClient, didReceiveIceCandidate iceCandidate: RTCIceCandidate, target: Livekit_SignalTarget) {
         guard let transport = target == .subscriber ? subscriber : publisher else {
             log("Failed to add ice candidate, transport is nil for target: \(target)", .error)
             return
@@ -51,7 +51,7 @@ extension Engine: SignalClientDelegate {
         }
     }
 
-    func signalClient(_: SignalClient, didReceiveAnswer answer: LKRTCSessionDescription) {
+    func signalClient(_: SignalClient, didReceiveAnswer answer: RTCSessionDescription) {
         Task {
             do {
                 let publisher = try requirePublisher()
@@ -62,7 +62,7 @@ extension Engine: SignalClientDelegate {
         }
     }
 
-    func signalClient(_ signalClient: SignalClient, didReceiveOffer offer: LKRTCSessionDescription) {
+    func signalClient(_ signalClient: SignalClient, didReceiveOffer offer: RTCSessionDescription) {
         log("Received offer, creating & sending answer...")
 
         guard let subscriber else {

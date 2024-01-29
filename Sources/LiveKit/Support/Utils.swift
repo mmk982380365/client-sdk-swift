@@ -220,7 +220,7 @@ class Utils {
         publishOptions: VideoPublishOptions?,
         isScreenShare: Bool = false,
         overrideVideoCodec: VideoCodec? = nil
-    ) -> [LKRTCRtpEncodingParameters] {
+    ) -> [RTCRtpEncodingParameters] {
         let publishOptions = publishOptions ?? VideoPublishOptions()
         let preferredEncoding: VideoEncoding? = isScreenShare ? publishOptions.screenShareEncoding : publishOptions.encoding
         let encoding = preferredEncoding ?? dimensions.computeSuggestedPreset(in: dimensions.computeSuggestedPresets(isScreenShare: isScreenShare))

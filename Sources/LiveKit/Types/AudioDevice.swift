@@ -24,9 +24,9 @@ public class AudioDevice: NSObject, MediaDevice {
     public var name: String { _ioDevice.name }
     public var isDefault: Bool { _ioDevice.isDefault }
 
-    let _ioDevice: LKRTCIODevice
+    let _ioDevice: RTCIODevice
 
-    init(ioDevice: LKRTCIODevice) {
+    init(ioDevice: RTCIODevice) {
         _ioDevice = ioDevice
     }
 }

@@ -27,7 +27,7 @@ import Foundation
 
     @available(macOS 12.3, *)
     public class MacOSScreenCapturer: VideoCapturer {
-        private let capturer = Engine.createVideoCapturer()
+        private let capturerInternal = Engine.createVideoCapturer()
 
         // TODO: Make it possible to change dynamically
         public let captureSource: MacOSScreenCaptureSource?
@@ -56,7 +56,7 @@ import Foundation
             guard didStart else { return false }
 
             guard let captureSource else {
-                throw TrackError.capturer(message: "captureSource is nil")
+                throw TrackError.capturerInternal(message: "captureSource is nil")
             }
 
             let filter: SCContentFilter
@@ -74,7 +74,7 @@ import Foundation
 
                 filter = SCContentFilter(display: nativeDisplay, excludingApplications: excludedApps, exceptingWindows: [])
             } else {
-                throw TrackError.capturer(message: "Unable to resolve SCContentFilter")
+                throw TrackError.capturerInternal(message: "Unable to resolve SCContentFilter")
             }
 
             let configuration = SCStreamConfiguration()
@@ -107,7 +107,7 @@ import Foundation
             guard didStop else { return false }
 
             guard let stream = _scStream else {
-                throw TrackError.capturer(message: "SCStream is nil")
+                throw TrackError.capturerInternal(message: "SCStream is nil")
             }
 
             // Stop resending paused frames
@@ -155,7 +155,7 @@ import Foundation
                                            timeStampNs: timeStampNs)
 
             // feed frame to WebRTC
-            delegate.capturer(capturer, didCapture: rtcFrame)
+            delegate.capturerInternal(capturerInternal, didCapture: rtcFrame)
 
             // cache last frame
             _lastFrame = rtcFrame
@@ -183,7 +183,7 @@ import Foundation
                                            timeStampNs: Self.createTimeStampNs())
 
             // feed frame to WebRTC
-            delegate.capturer(capturer, didCapture: newFrame)
+            delegate.capturerInternal(capturerInternal, didCapture: newFrame)
         }
     }
 
@@ -246,10 +246,10 @@ import Foundation
                                                 reportStatistics: Bool = false) -> LocalVideoTrack
         {
             let videoSource = Engine.createVideoSource(forScreenShare: true)
-            let capturer = MacOSScreenCapturer(delegate: videoSource, captureSource: source, options: options)
+            let capturerInternal = MacOSScreenCapturer(delegate: videoSource, captureSource: source, options: options)
             return LocalVideoTrack(name: name,
                                    source: .screenShareVideo,
-                                   capturer: capturer,
+                                   capturerInternal: capturerInternal,
                                    videoSource: videoSource,
                                    reportStatistics: reportStatistics)
         }
@@ -398,7 +398,7 @@ import Foundation
             let displaySources = try await sources(for: .display)
 
             guard let source = displaySources.compactMap({ $0 as? MacOSDisplay }).first(where: { $0.displayID == CGMainDisplayID() }) else {
-                throw TrackError.capturer(message: "Main display source not found")
+                throw TrackError.capturerInternal(message: "Main display source not found")
             }
 
             return source

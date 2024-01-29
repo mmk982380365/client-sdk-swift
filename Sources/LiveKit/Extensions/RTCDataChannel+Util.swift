@@ -18,7 +18,7 @@ import Foundation
 
 @_implementationOnly import WebRTC
 
-extension LKRTCDataChannel {
+extension RTCDataChannel {
     enum labels {
         static let reliable = "_reliable"
         static let lossy = "_lossy"

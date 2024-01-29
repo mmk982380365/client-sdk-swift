@@ -21,7 +21,7 @@ import Foundation
 protocol EngineDelegate: AnyObject {
     func engine(_ engine: Engine, didMutate state: Engine.State, oldState: Engine.State)
     func engine(_ engine: Engine, didUpdate speakers: [Livekit_SpeakerInfo])
-    func engine(_ engine: Engine, didAddTrack track: LKRTCMediaStreamTrack, rtpReceiver: LKRTCRtpReceiver, streams: [LKRTCMediaStream])
-    func engine(_ engine: Engine, didRemove track: LKRTCMediaStreamTrack)
+    func engine(_ engine: Engine, didAddTrack track: RTCMediaStreamTrack, rtpReceiver: RTCRtpReceiver, streams: [RTCMediaStream])
+    func engine(_ engine: Engine, didRemove track: RTCMediaStreamTrack)
     func engine(_ engine: Engine, didReceive userPacket: Livekit_UserPacket)
 }

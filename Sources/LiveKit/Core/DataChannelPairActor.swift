@@ -35,11 +35,11 @@ actor DataChannelPairActor: NSObject, Loggable {
     // MARK: - Private
 
     private let _onDataPacket: OnDataPacket?
-    private var _reliableChannel: LKRTCDataChannel?
-    private var _lossyChannel: LKRTCDataChannel?
+    private var _reliableChannel: RTCDataChannel?
+    private var _lossyChannel: RTCDataChannel?
 
-    public init(reliableChannel: LKRTCDataChannel? = nil,
-                lossyChannel: LKRTCDataChannel? = nil,
+    public init(reliableChannel: RTCDataChannel? = nil,
+                lossyChannel: RTCDataChannel? = nil,
                 onDataPacket: OnDataPacket? = nil)
     {
         _reliableChannel = reliableChannel
@@ -47,7 +47,7 @@ actor DataChannelPairActor: NSObject, Loggable {
         _onDataPacket = onDataPacket
     }
 
-    public func set(reliable channel: LKRTCDataChannel?) {
+    public func set(reliable channel: RTCDataChannel?) {
         _reliableChannel = channel
         channel?.delegate = self
 
@@ -56,7 +56,7 @@ actor DataChannelPairActor: NSObject, Loggable {
         }
     }
 
-    public func set(lossy channel: LKRTCDataChannel?) {
+    public func set(lossy channel: RTCDataChannel?) {
         _lossyChannel = channel
         channel?.delegate = self
 
@@ -102,8 +102,8 @@ actor DataChannelPairActor: NSObject, Loggable {
 
 // MARK: - RTCDataChannelDelegate
 
-extension DataChannelPairActor: LKRTCDataChannelDelegate {
-    nonisolated func dataChannelDidChangeState(_: LKRTCDataChannel) {
+extension DataChannelPairActor: RTCDataChannelDelegate {
+    nonisolated func dataChannelDidChangeState(_: RTCDataChannel) {
         Task {
             if await isOpen {
                 openCompleter.resume(returning: ())
@@ -111,7 +111,7 @@ extension DataChannelPairActor: LKRTCDataChannelDelegate {
         }
     }
 
-    nonisolated func dataChannel(_: LKRTCDataChannel, didReceiveMessageWith buffer: LKRTCDataBuffer) {
+    nonisolated func dataChannel(_: RTCDataChannel, didReceiveMessageWith buffer: RTCDataBuffer) {
         log("dataChannel(didReceiveMessageWith:)")
         guard let dataPacket = try? Livekit_DataPacket(contiguousBytes: buffer.data) else {
             log("could not decode data message", .error)

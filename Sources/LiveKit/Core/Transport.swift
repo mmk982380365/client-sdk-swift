@@ -20,7 +20,7 @@ import SwiftProtobuf
 @_implementationOnly import WebRTC
 
 class Transport: MulticastDelegate<TransportDelegate> {
-    typealias OnOfferBlock = (LKRTCSessionDescription) async throws -> Void
+    typealias OnOfferBlock = (RTCSessionDescription) async throws -> Void
 
     // MARK: - Public
 
@@ -34,11 +34,11 @@ class Transport: MulticastDelegate<TransportDelegate> {
         DispatchQueue.liveKitWebRTC.sync { _pc.connectionState }
     }
 
-    public var localDescription: LKRTCSessionDescription? {
+    public var localDescription: RTCSessionDescription? {
         DispatchQueue.liveKitWebRTC.sync { _pc.localDescription }
     }
 
-    public var remoteDescription: LKRTCSessionDescription? {
+    public var remoteDescription: RTCSessionDescription? {
         DispatchQueue.liveKitWebRTC.sync { _pc.remoteDescription }
     }
 
@@ -68,13 +68,13 @@ class Transport: MulticastDelegate<TransportDelegate> {
     private var _reNegotiate: Bool = false
 
     // forbid direct access to PeerConnection
-    private let _pc: LKRTCPeerConnection
-    private var _pendingCandidatesQueue = AsyncQueueActor<LKRTCIceCandidate>()
+    private let _pc: RTCPeerConnection
+    private var _pendingCandidatesQueue = AsyncQueueActor<RTCIceCandidate>()
 
     // keep reference to cancel later
     private var _debounceWorkItem: DispatchWorkItem?
 
-    init(config: LKRTCConfiguration,
+    init(config: RTCConfiguration,
          target: Livekit_SignalTarget,
          primary: Bool,
          delegate: TransportDelegate) throws
@@ -101,7 +101,7 @@ class Transport: MulticastDelegate<TransportDelegate> {
         log()
     }
 
-    func add(iceCandidate candidate: LKRTCIceCandidate) async throws {
+    func add(iceCandidate candidate: RTCIceCandidate) async throws {
         if remoteDescription != nil, !isRestartingIce {
             return try await _pc.add(candidate)
         }
@@ -109,7 +109,7 @@ class Transport: MulticastDelegate<TransportDelegate> {
         await _pendingCandidatesQueue.enqueue(candidate)
     }
 
-    func set(remoteDescription sd: LKRTCSessionDescription) async throws {
+    func set(remoteDescription sd: RTCSessionDescription) async throws {
         try await _pc.setRemoteDescription(sd)
 
         try await _pendingCandidatesQueue.resume { candidate in
@@ -181,38 +181,38 @@ class Transport: MulticastDelegate<TransportDelegate> {
 // MARK: - Stats
 
 extension Transport {
-    func statistics(for sender: LKRTCRtpSender) async -> LKRTCStatisticsReport {
+    func statistics(for sender: RTCRtpSender) async -> RTCStatisticsReport {
         await _pc.statistics(for: sender)
     }
 
-    func statistics(for receiver: LKRTCRtpReceiver) async -> LKRTCStatisticsReport {
+    func statistics(for receiver: RTCRtpReceiver) async -> RTCStatisticsReport {
         await _pc.statistics(for: receiver)
     }
 }
 
 // MARK: - RTCPeerConnectionDelegate
 
-extension Transport: LKRTCPeerConnectionDelegate {
-    func peerConnection(_: LKRTCPeerConnection, didChange state: RTCPeerConnectionState) {
+extension Transport: RTCPeerConnectionDelegate {
+    func peerConnection(_: RTCPeerConnection, didChange state: RTCPeerConnectionState) {
         log("did update state \(state) for \(target)")
         notify { $0.transport(self, didUpdate: state) }
     }
 
-    func peerConnection(_: LKRTCPeerConnection,
-                        didGenerate candidate: LKRTCIceCandidate)
+    func peerConnection(_: RTCPeerConnection,
+                        didGenerate candidate: RTCIceCandidate)
     {
         log("Did generate ice candidates \(candidate) for \(target)")
         notify { $0.transport(self, didGenerate: candidate) }
     }
 
-    func peerConnectionShouldNegotiate(_: LKRTCPeerConnection) {
+    func peerConnectionShouldNegotiate(_: RTCPeerConnection) {
         log("ShouldNegotiate for \(target)")
         notify { $0.transportShouldNegotiate(self) }
     }
 
-    func peerConnection(_: LKRTCPeerConnection,
-                        didAdd rtpReceiver: LKRTCRtpReceiver,
-                        streams mediaStreams: [LKRTCMediaStream])
+    func peerConnection(_: RTCPeerConnection,
+                        didAdd rtpReceiver: RTCRtpReceiver,
+                        streams mediaStreams: [RTCMediaStream])
     {
         guard let track = rtpReceiver.track else {
             log("Track is empty for \(target)", .warning)
@@ -223,8 +223,8 @@ extension Transport: LKRTCPeerConnectionDelegate {
         notify { $0.transport(self, didAddTrack: track, rtpReceiver: rtpReceiver, streams: mediaStreams) }
     }
 
-    func peerConnection(_: LKRTCPeerConnection,
-                        didRemove rtpReceiver: LKRTCRtpReceiver)
+    func peerConnection(_: RTCPeerConnection,
+                        didRemove rtpReceiver: RTCRtpReceiver)
     {
         guard let track = rtpReceiver.track else {
             log("Track is empty for \(target)", .warning)
@@ -235,24 +235,24 @@ extension Transport: LKRTCPeerConnectionDelegate {
         notify { $0.transport(self, didRemove: track) }
     }
 
-    func peerConnection(_: LKRTCPeerConnection, didOpen dataChannel: LKRTCDataChannel) {
+    func peerConnection(_: RTCPeerConnection, didOpen dataChannel: RTCDataChannel) {
         log("Received data channel \(dataChannel.label) for \(target)")
         notify { $0.transport(self, didOpen: dataChannel) }
     }
 
-    func peerConnection(_: LKRTCPeerConnection, didChange _: RTCIceConnectionState) {}
-    func peerConnection(_: LKRTCPeerConnection, didRemove _: LKRTCMediaStream) {}
-    func peerConnection(_: LKRTCPeerConnection, didChange _: RTCSignalingState) {}
-    func peerConnection(_: LKRTCPeerConnection, didAdd _: LKRTCMediaStream) {}
-    func peerConnection(_: LKRTCPeerConnection, didChange _: RTCIceGatheringState) {}
-    func peerConnection(_: LKRTCPeerConnection, didRemove _: [LKRTCIceCandidate]) {}
+    func peerConnection(_: RTCPeerConnection, didChange _: RTCIceConnectionState) {}
+    func peerConnection(_: RTCPeerConnection, didRemove _: RTCMediaStream) {}
+    func peerConnection(_: RTCPeerConnection, didChange _: RTCSignalingState) {}
+    func peerConnection(_: RTCPeerConnection, didAdd _: RTCMediaStream) {}
+    func peerConnection(_: RTCPeerConnection, didChange _: RTCIceGatheringState) {}
+    func peerConnection(_: RTCPeerConnection, didRemove _: [RTCIceCandidate]) {}
 }
 
 // MARK: - Private
 
 private extension Transport {
-    func createOffer(for constraints: [String: String]? = nil) async throws -> LKRTCSessionDescription {
-        let mediaConstraints = LKRTCMediaConstraints(mandatoryConstraints: constraints,
+    func createOffer(for constraints: [String: String]? = nil) async throws -> RTCSessionDescription {
+        let mediaConstraints = RTCMediaConstraints(mandatoryConstraints: constraints,
                                                      optionalConstraints: nil)
 
         return try await _pc.offer(for: mediaConstraints)
@@ -262,19 +262,19 @@ private extension Transport {
 // MARK: - Internal
 
 extension Transport {
-    func createAnswer(for constraints: [String: String]? = nil) async throws -> LKRTCSessionDescription {
-        let mediaConstraints = LKRTCMediaConstraints(mandatoryConstraints: constraints,
+    func createAnswer(for constraints: [String: String]? = nil) async throws -> RTCSessionDescription {
+        let mediaConstraints = RTCMediaConstraints(mandatoryConstraints: constraints,
                                                      optionalConstraints: nil)
 
         return try await _pc.answer(for: mediaConstraints)
     }
 
-    func set(localDescription sd: LKRTCSessionDescription) async throws {
+    func set(localDescription sd: RTCSessionDescription) async throws {
         try await _pc.setLocalDescription(sd)
     }
 
-    func addTransceiver(with track: LKRTCMediaStreamTrack,
-                        transceiverInit: LKRTCRtpTransceiverInit) throws -> LKRTCRtpTransceiver
+    func addTransceiver(with track: RTCMediaStreamTrack,
+                        transceiverInit: RTCRtpTransceiverInit) throws -> RTCRtpTransceiver
     {
         guard let transceiver = DispatchQueue.liveKitWebRTC.sync(execute: { _pc.addTransceiver(with: track, init: transceiverInit) }) else {
             throw EngineError.webRTC(message: "Failed to add transceiver")
@@ -283,15 +283,15 @@ extension Transport {
         return transceiver
     }
 
-    func remove(track sender: LKRTCRtpSender) throws {
+    func remove(track sender: RTCRtpSender) throws {
         guard DispatchQueue.liveKitWebRTC.sync(execute: { _pc.removeTrack(sender) }) else {
             throw EngineError.webRTC(message: "Failed to remove track")
         }
     }
 
     func dataChannel(for label: String,
-                     configuration: LKRTCDataChannelConfiguration,
-                     delegate: LKRTCDataChannelDelegate? = nil) -> LKRTCDataChannel?
+                     configuration: RTCDataChannelConfiguration,
+                     delegate: RTCDataChannelDelegate? = nil) -> RTCDataChannel?
     {
         let result = DispatchQueue.liveKitWebRTC.sync { _pc.dataChannel(forLabel: label, configuration: configuration) }
         result?.delegate = delegate

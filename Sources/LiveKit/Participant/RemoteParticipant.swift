@@ -82,7 +82,7 @@ public class RemoteParticipant: Participant {
         }
     }
 
-    func addSubscribedMediaTrack(rtcTrack: LKRTCMediaStreamTrack, rtpReceiver: LKRTCRtpReceiver, sid: Sid) async throws {
+    func addSubscribedMediaTrack(rtcTrack: RTCMediaStreamTrack, rtpReceiver: RTCRtpReceiver, sid: Sid) async throws {
         let track: Track
 
         guard let publication = getTrackPublication(sid: sid) else {

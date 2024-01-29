@@ -47,19 +47,19 @@ class SampleBufferVideoRenderer: NativeView, Loggable {
     }
 }
 
-extension SampleBufferVideoRenderer: LKRTCVideoRenderer {
+extension SampleBufferVideoRenderer: RTCVideoRenderer {
     func setSize(_: CGSize) {
         //
     }
 
-    func renderFrame(_ frame: LKRTCVideoFrame?) {
+    func renderFrame(_ frame: RTCVideoFrame?) {
         guard let frame else { return }
 
         var pixelBuffer: CVPixelBuffer?
 
-        if let rtcPixelBuffer = frame.buffer as? LKRTCCVPixelBuffer {
+        if let rtcPixelBuffer = frame.buffer as? RTCCVPixelBuffer {
             pixelBuffer = rtcPixelBuffer.pixelBuffer
-        } else if let rtcI420Buffer = frame.buffer as? LKRTCI420Buffer {
+        } else if let rtcI420Buffer = frame.buffer as? RTCI420Buffer {
             pixelBuffer = rtcI420Buffer.toPixelBuffer()
         }
 

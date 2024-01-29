@@ -127,7 +127,7 @@ extension Room: EngineDelegate {
         }
     }
 
-    func engine(_: Engine, didAddTrack track: LKRTCMediaStreamTrack, rtpReceiver: LKRTCRtpReceiver, streams: [LKRTCMediaStream]) {
+    func engine(_: Engine, didAddTrack track: RTCMediaStreamTrack, rtpReceiver: RTCRtpReceiver, streams: [RTCMediaStream]) {
         guard !streams.isEmpty else {
             log("Received onTrack with no streams!", .warning)
             return
@@ -159,7 +159,7 @@ extension Room: EngineDelegate {
         }
     }
 
-    func engine(_: Engine, didRemove track: LKRTCMediaStreamTrack) {
+    func engine(_: Engine, didRemove track: RTCMediaStreamTrack) {
         // find the publication
         guard let publication = _state.remoteParticipants.values.map(\._state.trackPublications.values).joined()
             .first(where: { $0.sid == track.trackId }) else { return }

@@ -244,7 +244,7 @@ extension Engine {
         let connectOptions = _state.connectOptions
 
         // Make a copy, instead of modifying the user-supplied RTCConfiguration object.
-        let rtcConfiguration = LKRTCConfiguration.liveKitDefault()
+        let rtcConfiguration = RTCConfiguration.liveKitDefault()
 
         // Set iceServers provided by the server
         rtcConfiguration.iceServers = joinResponse.iceServers.map { $0.toRTCType() }
@@ -276,10 +276,10 @@ extension Engine {
 
         // data over pub channel for backwards compatibility
 
-        let reliableDataChannel = publisher.dataChannel(for: LKRTCDataChannel.labels.reliable,
+        let reliableDataChannel = publisher.dataChannel(for: RTCDataChannel.labels.reliable,
                                                         configuration: Engine.createDataChannelConfiguration())
 
-        let lossyDataChannel = publisher.dataChannel(for: LKRTCDataChannel.labels.lossy,
+        let lossyDataChannel = publisher.dataChannel(for: RTCDataChannel.labels.lossy,
                                                      configuration: Engine.createDataChannelConfiguration(maxRetransmits: 0))
 
         await publisherDataChannel.set(reliable: reliableDataChannel)

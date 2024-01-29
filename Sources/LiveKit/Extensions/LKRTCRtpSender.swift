@@ -18,7 +18,7 @@ import Foundation
 
 @_implementationOnly import WebRTC
 
-extension LKRTCRtpSender: Loggable {
+extension RTCRtpSender: Loggable {
     // ...
     func _set(subscribedQualities qualities: [Livekit_SubscribedQuality]) {
         let _parameters = parameters

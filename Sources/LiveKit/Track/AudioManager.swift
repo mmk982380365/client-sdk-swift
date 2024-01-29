@@ -20,7 +20,7 @@ import Foundation
 
 @objc
 public class AudioBuffer: NSObject {
-    private let _audioBuffer: LKRTCAudioBuffer
+    private let _audioBuffer: RTCAudioBuffer
 
     public var channels: Int { _audioBuffer.channels }
     public var frames: Int { _audioBuffer.frames }
@@ -31,7 +31,7 @@ public class AudioBuffer: NSObject {
         _audioBuffer.rawBuffer(forChannel: channel)
     }
 
-    init(audioBuffer: LKRTCAudioBuffer) {
+    init(audioBuffer: RTCAudioBuffer) {
         _audioBuffer = audioBuffer
     }
 }
@@ -43,7 +43,7 @@ public protocol AudioCustomProcessingDelegate {
     func audioProcessingRelease()
 }
 
-class AudioCustomProcessingDelegateAdapter: NSObject, LKRTCAudioCustomProcessingDelegate {
+class AudioCustomProcessingDelegateAdapter: NSObject, RTCAudioCustomProcessingDelegate {
     weak var target: AudioCustomProcessingDelegate?
 
     init(target: AudioCustomProcessingDelegate? = nil) {
@@ -54,7 +54,7 @@ class AudioCustomProcessingDelegateAdapter: NSObject, LKRTCAudioCustomProcessing
         target?.audioProcessingInitialize(sampleRate: sampleRateHz, channels: channels)
     }
 
-    func audioProcessingProcess(audioBuffer: LKRTCAudioBuffer) {
+    func audioProcessingProcess(audioBuffer: RTCAudioBuffer) {
         target?.audioProcessingProcess(audioBuffer: AudioBuffer(audioBuffer: audioBuffer))
     }
 
@@ -161,9 +161,9 @@ public class AudioManager: Loggable {
 
     // MARK: - AudioDeviceModule
 
-    public let defaultOutputDevice = AudioDevice(ioDevice: LKRTCIODevice.defaultDevice(with: .output))
+    public let defaultOutputDevice = AudioDevice(ioDevice: RTCIODevice.defaultDevice(with: .output))
 
-    public let defaultInputDevice = AudioDevice(ioDevice: LKRTCIODevice.defaultDevice(with: .input))
+    public let defaultInputDevice = AudioDevice(ioDevice: RTCIODevice.defaultDevice(with: .input))
 
     public var outputDevices: [AudioDevice] {
         Engine.audioDeviceModule.outputDevices.map { AudioDevice(ioDevice: $0) }
@@ -253,7 +253,7 @@ public class AudioManager: Loggable {
                 guard let self else { return }
 
                 // prepare config
-                let configuration = LKRTCAudioSessionConfiguration.webRTC()
+                let configuration = RTCAudioSessionConfiguration.webRTC()
 
                 if newState.trackState == .remoteOnly && newState.preferSpeakerOutput {
                     /* .playback */
@@ -301,7 +301,7 @@ public class AudioManager: Loggable {
                 }
 
                 // configure session
-                let session = LKRTCAudioSession.sharedInstance()
+                let session = RTCAudioSession.sharedInstance()
                 session.lockForConfiguration()
                 // always unlock
                 defer { session.unlockForConfiguration() }

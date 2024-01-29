@@ -18,9 +18,9 @@ import Foundation
 
 @_implementationOnly import WebRTC
 
-extension LKRTCConfiguration {
-    static func liveKitDefault() -> LKRTCConfiguration {
-        let result = DispatchQueue.liveKitWebRTC.sync { LKRTCConfiguration() }
+extension RTCConfiguration {
+    static func liveKitDefault() -> RTCConfiguration {
+        let result = DispatchQueue.liveKitWebRTC.sync { RTCConfiguration() }
         result.sdpSemantics = .unifiedPlan
         result.continualGatheringPolicy = .gatherContinually
         result.candidateNetworkPolicy = .all

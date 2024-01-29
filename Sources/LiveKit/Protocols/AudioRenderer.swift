@@ -25,7 +25,7 @@ public protocol AudioRenderer {
     func render(sampleBuffer: CMSampleBuffer)
 }
 
-class AudioRendererAdapter: NSObject, LKRTCAudioRenderer {
+class AudioRendererAdapter: NSObject, RTCAudioRenderer {
     private weak var target: AudioRenderer?
 
     init(target: AudioRenderer) {
