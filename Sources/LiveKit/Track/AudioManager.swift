@@ -19,7 +19,7 @@ import Foundation
 @_implementationOnly import WebRTC
 
 @objc
-public class AudioBuffer: NSObject {
+public class LKAudioBuffer: NSObject {
     private let _audioBuffer: RTCAudioBuffer
 
     public var channels: Int { _audioBuffer.channels }
@@ -39,7 +39,7 @@ public class AudioBuffer: NSObject {
 @objc
 public protocol AudioCustomProcessingDelegate {
     func audioProcessingInitialize(sampleRate sampleRateHz: Int, channels: Int)
-    func audioProcessingProcess(audioBuffer: AudioBuffer)
+    func audioProcessingProcess(audioBuffer: LKAudioBuffer)
     func audioProcessingRelease()
 }
 
@@ -55,7 +55,7 @@ class AudioCustomProcessingDelegateAdapter: NSObject, RTCAudioCustomProcessingDe
     }
 
     func audioProcessingProcess(audioBuffer: RTCAudioBuffer) {
-        target?.audioProcessingProcess(audioBuffer: AudioBuffer(audioBuffer: audioBuffer))
+        target?.audioProcessingProcess(audioBuffer: LKAudioBuffer(audioBuffer: audioBuffer))
     }
 
     func audioProcessingRelease() {
